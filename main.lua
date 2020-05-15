@@ -1,209 +1,215 @@
-local textures, width, height, time, gdt, pull, GRAVITY, player, size
+inspect = require("third_party/inspect")
 
-inspect = require("inspect")
+local Vector, Quad, Entity, Static
+textures, loaded_objects, player, size, bounds, time = {}, {}, {}, {}, {}, 0
+
+Vector = require("modules/Vector")
+Sprite = require("modules/Sprite")
+Static = require("modules/Static")
+Entity = require("modules/Entity")
 
 function love.load()
-	local path       = "assets/"
-	local background = path .. "background/"
-	local sprites    = path .. "sprites/"
-	local static     = path .. "objects/"
+	local background, sprites, loaded_objects, win_w, win_h
 	
-	y, x, time, gdt, pull = 0, 0, 0, 0, 0
+	time, pull      = 0, 0
+	win_w, win_h, _ = love.window.getMode()
 	
-	size = {
-		width = {
-			full = 1920,
-			half = 960
-		},
-		height = {
-			full = 1080,
-			half = 540
-		}
-	}
+	calculateSize()
 	
-	local temp_imgs = {
-		bird = love.graphics.newImage(sprites .. "bird.png"),
-		tree = love.graphics.newImage(sprites .. "tree.png")
-	}
+	loaded_objects = {}
 	
-	local bird, tree = {}, {}
+	textures = { blank = Static(love.graphics.newImage("assets/blank.png"), "blank") }
 	
-	bird[1], bird[2], bird[3] = loadQuad(temp_imgs.bird, 2, 2)
-	tree[1], tree[2], tree[3] = loadQuad(temp_imgs.tree, 1, 2)
+	calculateBounds()
+		
+	loadBackgroundTextures()
+	loadAnimatedTextures()
+	loadObjectTextures()
 	
-	textures = {
-		background = {
-			skybox     = love.graphics.newImage(background .. "skybox.png"),
-			mountains  = love.graphics.newImage(background .. "mountains.png"),
-			clouds     = love.graphics.newImage(background .. "clouds.png"),
-			cityscape  = love.graphics.newImage(background .. "cityscape.png"),
-			foreground = love.graphics.newImage(background .. "level.png")
-		},
-		sprites = {
-			bird = {temp_imgs.bird, bird[1], bird[2], bird[3], 1},
-			tree = {temp_imgs.tree, tree[1], tree[2], tree[3], 1}
-		},
-		static = {
-			balcony = love.graphics.newImage(static .. "balcony.png"),
-			bench = love.graphics.newImage(static .. "bench.png"),
-			awning = love.graphics.newImage(static .. "awning.png"),
-			fire_escape = love.graphics.newImage(static .. "fire_escape.png"),
-			chimney = love.graphics.newImage(static .. "chimney.png"),
-			falling_poop = love.graphics.newImage(static .. "falling_poop.png"),
-			fallen_poop = love.graphics.newImage(static .. "fallen_poop.png")
-		}
-	}
-
-	size.width.window, size.height.window, _ = love.window.getMode()
-	size.width.scale, size.height.scale = size.width.window / size.width.full, size.height.window / size.height.full
-	
-	player = {
-		x = 500,
-		y = size.height.window / 4,
-		speed = 0,
-		jump = -10,
+	player = { 
+		e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4),
+		jump  = 10,
+		score = 0,
 		poops = {}
 	}
-	
-	GRAVITY = 18 * size.height.scale
 end
 
 function love.update(dt)
-	if love.keyboard.isDown("d") then
-		player.speed = player.speed + (100 * dt)
-	elseif love.keyboard.isDown("a") then
-		player.speed = player.speed - (100 * dt)
+	local left, right
+	
+	right = love.keyboard.isDown("d")
+	left  = love.keyboard.isDown("a")
+	
+	if right then
+		player.e:addVelocity(50 * dt, 0)
+	elseif left then
+		player.e:addVelocity(-50 * dt, 0)
 	end
 
-	player.speed = math.min(player.speed, 10)
-	player.x = player.speed + player.x
+	player.e:update(dt)
 	
-	player.speed = player.speed - (10 * dt)
-	player.speed = math.max(player.speed, -10)
-
-	if player.y * size.height.scale > size.height.window - (50 * size.height.scale) then
-		error("GAME OVER")
-	elseif player.x * size.width.scale > size.width.window then
-		error("GAME OVER")
-	elseif player.x < 0 then
-		error("GAME OVER")
+	if outOfBounds() then endGame() end
+	
+	for i = 1, #loaded_objects, 1 do
+		loaded_objects[i]:update(dt)
+	end
+	
+	for i = 1, #player.poops, 1 do
+		player.poops[i]:update(dt)
 	end
 
-	pull = pull + dt * GRAVITY
-	
-	player.y = player.y + pull
-	gdt = dt
 	time = time + dt
 end
 
 function love.draw()
-	local bg = textures.background
-	local sp = textures.sprites
-	local rw, rh, hh, hw, sw
-	local clouds_pos, mount_pos, city_pos, level_pos
-	
-	rw = size.width.scale
-	rh = size.height.scale
-	hh = size.height.half
-	hw = size.width.half
-
-	sh = hh * rh
-	sw = hw * rw
-	
-	clouds_pos = cycle(time * -25 * rw, -sw, sw)
-	mount_pos  = cycle(time * -60 * rw, -sw, sw)
-	city_pos   = cycle(time * -80 * rw, -sw, sw)
-	level_pos  = cycle(time * -120 * rw, -sw * 3, sw * 3)
-	
-	drawBG(clouds_pos, mount_pos, city_pos, sw, rw, rh, hw, hh)
-	drawCity(level_pos, sw, rw, sh, rh, hh)
-	
-	drawPoops()
-	drawQuad(sp.bird, 4, player.x * rw, player.y * rh, 0, rw, rh)
+	for i = 1, #loaded_objects, 1 do
+		loaded_objects[i]:draw()
+	end
 end
 
 function love.resize()
-	size.width.window, size.height.window, _ = love.window.getMode()
-	
-	size.width.scale, size.height.scale = size.width.window / size.width.full, size.height.window / size.height.full
-	
-	GRAVITY = 18 * size.height.scale
+	calculateSize()
+	calculateBounds()
 end
 
 function love.keypressed(k)
-	if k == "space" then
-		pull = player.jump * size.height.scale
+	local jump, poop
+	
+	jump = k == "space"
+	poop = k == "e"
+	
+	if jump then player.e:addVelocity(0, player.jump) end
+	
+	if poop then player.poops[#player.poops + 1] = createPoop() end
+end
+
+function loadBackgroundTextures()
+	local t, bg
+	
+	t  = {}
+	bg = "assets/background/"
+	
+	t.sky       = Static(love.graphics.newImage(bg .. "skybox.png"), "sky")
+	t.mountains = Static(love.graphics.newImage(bg .. "mountains.png"), "mountains")
+	t.city      = Static(love.graphics.newImage(bg .. "cityscape.png"), "city")
+	t.clouds    = loadStaticsFromFolder(bg .. "clouds")
+	
+	textures.bg = t
+end
+
+function loadAnimatedTextures()
+	local t, sp
+	
+	t  = {}
+	sp = "assets/sprites/"
+	
+	t.trees = loadSpritesFromFolder(sp .. "trees", 1, 2)
+	
+	textures.sprites = t
+end
+
+function loadObjectTextures()
+	local t, objs
+	
+	t    = {}
+	objs = "assets/objects/"
+	
+	t.balcony  = Static(love.graphics.newImage(objs .. "balcony.png"), "balcony")
+	t.bench    = Static(love.graphics.newImage(objs .. "bench.png"), "bench")
+	t.awning   = Static(love.graphics.newImage(objs .. "awning.png"), "awning")
+	t.fire_esc = Static(love.graphics.newImage(objs .. "fire_escape.png"), "fire_escape")
+	t.chimney  = Static(love.graphics.newImage(objs .. "chimney.png"), "chimney")
+	t.poop     = Static(love.graphics.newImage(objs .. "falling_poop.png"), "falling")
+	
+	t.poop:addImage(objs .. "fallen_poop.png", "fallen")
+	
+	textures.static = t
+end
+
+function loadStaticsFromFolder(path)
+	local i, res, succ, val
+	
+	i    = 1
+	res  = Static(love.graphics.newImage(path .. "/1.png"), "1")
+	
+	succ, val = pcall(love.graphics.newImage, path .. "/2.png")
+	
+	i = 2
+	
+	while succ do
+		res:addImage(val, tostring(i))
+
+		i = i + 1
+		
+		succ, val = pcall(love.graphics.newImage, path .. "/" .. i .. ".png")
 	end
 	
-	if k == "e" then
-		poop()
+	return res
+end
+
+function loadSpritesFromFolder(path, rows, cols)
+	local i, res, succ, val
+	
+	i    = 1
+	res  = Sprite(love.graphics.newImage(path .. "/1.png"), rows, cols, "1")
+	
+	succ, val = pcall(love.graphics.newImage, path .. "/2.png", rows, cols)
+	
+	i = 2
+	
+	while succ do
+		res:addAnimation(val, tostring(i))
+
+		i = i + 1
+		
+		succ, val = pcall(love.graphics.newImage, path .. "/" .. i .. ".png", rows, cols)
+	end
+	
+	return res
+end
+
+function calculateSize()
+	local w, h, _ = love.window.getMode()
+
+	if #size == 0 then
+		size = {
+			full = Vector(1920, 1080),
+			half = Vector(960, 540),
+			win  = Vector(w, h)
+		}
+		
+		size.scale = size.win / size.full
+	else
+		size.win:set(w, h)
+		size.scale:set(size.win / size.full)
 	end
 end
 
-function intersect(player, obj)
-	--if player.pos + 100
+function calculateBounds()
+	local w, h = size.win.x, size.win.y
+	
+	bounds = { 
+		top    = Entity(textures.blank, 0, -50,  w, 50, nil, "env"),
+		bottom = Entity(textures.blank, 0,   h,  w, 50, nil, "env"),
+		left   = Entity(textures.blank, -50, 0, 50,  h, nil, "env"),
+		right  = Entity(textures.blank,   w, 0, 50,  h, nil, "env")
+	}
 end
 
-function poop()
-	player.poops[#player.poops + 1] = {player.x, player.y, time}
-	print("Pooped at ", player.x, player.y)
+function endGame()
+	error("GAME OVER")
 end
 
-function drawBG(clouds_pos, mount_pos, city_pos, sw, rw, rh, hw, hh)
-	local bg = textures.background
-	
-	local vertical_adjust, y
-	
-	vertical_adjust = rh * - 75
-	y = vertical_adjust + sh
-	
-	love.graphics.draw(bg.skybox,    0,                   0, 0, rw, rh)
-	love.graphics.draw(bg.clouds,    clouds_pos,          y, 0, rw, rh, hw, hh)
-	love.graphics.draw(bg.clouds,    clouds_pos + sw * 2, y, 0, rw, rh, hw, hh)
-	love.graphics.draw(bg.mountains, mount_pos,           y, 0, rw, rh, hw, hh)
-	love.graphics.draw(bg.mountains, mount_pos + sw * 2,  y, 0, rw, rh, hw, hh)
-	love.graphics.draw(bg.cityscape, city_pos,            y, 0, rw, rh, hw, hh)
-	love.graphics.draw(bg.cityscape, city_pos + sw * 2,   y, 0, rw, rh, hw, hh)
+function outOfBounds()
+	return (player.e:collide(bounds.top) and player.e:collide(bounds.bottom) and player.e:collide(bounds.left) and player.e:collide(bounds.right))
 end
 
-function drawCity(level_pos, sw, rw, sh, rh, hh)
-	local sp, right_adjust, fgw, bg, st, ground_item
+function createPoop()
+	local img, e
 	
-	bg = textures.background
-	sp = textures.sprites
-	st = textures.static
-	fgw = bg.foreground:getWidth()
-	right_adjust = fgw * rw
+	img = textures.static.falling_poop
+	e   = Entity(img, player.pos.x, player.pos.y, img:getWidth(), img:getHeight(), Vector.fromAngle(math.random(-5, 5)))
 	
-	local function ground_height(item_size)
-		return size.height.window - ((item_size / 2) * rh) - (rh * 25)
-	end
-	
-	love.graphics.draw(bg.foreground, level_pos, sh, 0, rw, rh, fgw / 2, hh)
-	love.graphics.draw(bg.foreground, level_pos + right_adjust, sh, 0, rw, rh, fgw / 2, hh)
-	
-	drawQuad(sp.tree, 1, level_pos + (-2260 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (-1260 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (-500 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (600 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (1440 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (2760 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (3500 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	drawQuad(sp.tree, 1, level_pos + (4500 * rw), ground_height(sp.tree[4]), 0, rw, rh)
-	
-	love.graphics.draw(st.balcony, level_pos + (-2740 * rw), (300 * rh), 0, rw, rh)
-	love.graphics.draw(st.balcony, level_pos + (960 * rw), (380 * rh), 0, rw, rh)
-	love.graphics.draw(st.balcony, level_pos + (3020 * rw), (300 * rh), 0, rw, rh)
-	
-	love.graphics.draw(st.bench, level_pos + (1900 * rw), (880 * rh), 0, rw, rh)
-	
-	love.graphics.draw(st.awning, level_pos + (3920 * rw), (600 * rh), 0, rw, rh)
-	love.graphics.draw(st.awning, level_pos + (-1840 * rw), (600 * rh), 0, rw, rh)
-	love.graphics.draw(st.awning, level_pos + (-60 * rw), (620 * rh), 0, rw, rh)
-	
-	love.graphics.draw(st.fire_escape, level_pos + (1940 * rw), (220 * rh), 0, rw, rh)
-	
-	love.graphics.draw(st.chimney, level_pos + (-560 * rw), (100 * rh), 0, rw, rh)
 end
 
 function drawPoops()
@@ -217,7 +223,7 @@ function drawPoops()
 
 	for i = 1, #player.poops, 1 do
 		local poop = player.poops[i]
-		local x = (time - poop[3]) * -120 * rw
+		local x = (time - poop[3]) * -200 * rw
 
 		poop[2] = poop[4] and size.height.window - (50 * rh) or poop[2] + gdt * GRAVITY * ((time - poop[3]) * 35)
 
@@ -235,31 +241,6 @@ function drawPoops()
 	player.poops = new
 end
 
-function loadQuad(image, rows, cols)
-	local w, h = image:getWidth(), image:getHeight()
-	local fw, fh = math.floor(w / cols), math.floor(h / rows)
-	local frames = {}
-	
-	for i = 0, rows - 1, 1 do
-		for j = 0, cols - 1, 1 do
-			frames[#frames + 1] = love.graphics.newQuad(j * fw, i * fh, fw, fh, w, h)
-		end
-	end
-	
-	return frames, fw, fh
-end
-
-function drawQuad(tbl, spd, x, y, r, sx, sy, ox, oy)
-	local image, quad, frame
-	
-	image = tbl[1]
-	quad  = tbl[2]
-	frame = math.floor(tbl[5]) > #quad and #quad or math.floor(tbl[5])
-
-	love.graphics.draw(image, quad[frame], x, y, r, sx, sy, tbl[3] / 2, tbl[4] / 2) 
-	
-	tbl[5] = tbl[5] >= #quad + 1 and 1 + spd * gdt or tbl[5] + spd * gdt
-end
 
 function cycle(input, min, max)
 	delta = max - min
