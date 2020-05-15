@@ -36,15 +36,16 @@ function love.update(dt)
 	left  = love.keyboard.isDown("a")
 	
 	if right then
-		player.e:addVelocity(50 * dt, 0)
+		player.e:accelerate((50 * dt) * size.scale.x, 0)
 	elseif left then
-		player.e:addVelocity(-50 * dt, 0)
+		player.e:accelerate((-50 * dt) * size.scale.x, 0)
 	else
 		--slows movement along x axis when no longer pressing left or right
-		player.e:addVelocity(player.e.vel.x / -10, 0)
+		player.e:accelerate(player.e.vel.x / -20, 0)
 	end
 
 	player.e:update(dt)
+	player.e._.raw_vel:maxMag(30)
 	
 	if outOfBounds() then endGame() end
 	
@@ -56,8 +57,6 @@ function love.update(dt)
 		player.poops[i]:update(dt)
 	end
 	
-	print(player.e.vel.mag)
-
 	time = time + dt
 end
 
@@ -85,12 +84,8 @@ function love.keypressed(k)
 	jump = k == "space"
 	poop = k == "e"
 	
-	if jump then 
-		player.e:addVelocity(0, player.jump)
-		
-		if player.e.vel.mag > 10 then --diminishing returns
-			player.e:addVelocity(0, -(player.e.vel.mag))
-		end
+	if jump then
+		player.e:impulse(0, player.jump)
 	end
 	
 	if poop then player.poops[#player.poops + 1] = createPoop() end
@@ -210,7 +205,7 @@ function calculateBounds()
 end
 
 function calculatePlayer()
-	local JUMP = 100
+	local JUMP = 10
 	
 	if #player == 0 then
 		player = { 
@@ -240,6 +235,9 @@ function createPoop()
 	
 end
 
+
+
+
 function drawPoops()
 	local rw, sw, rh, st, new
 	
@@ -268,7 +266,6 @@ function drawPoops()
 	
 	player.poops = new
 end
-
 
 function cycle(input, min, max)
 	delta = max - min

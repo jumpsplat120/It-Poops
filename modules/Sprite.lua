@@ -76,7 +76,7 @@ function Sprite:setAnimation(name)
 end
 
 function Sprite:draw(speed, x, y, r, sx, sy, ox, oy)
-	love.graphics.draw(self.img, self.frame, x, y, r, xs, sy, ox, oy)
+	love.graphics.draw(self.img, self.frame, x, y, r, sx, sy, ox, oy)
 	
 	self._.frame_index = self._.frame_index + speed >= self._.frame_max and 1 + speed or self._.frame_index + speed
 	self._.frame       = self._.frames[math.floor(self._.frame_index) > self._.frame_max and self._.frame_max or math.floor(self._.frame_index)]

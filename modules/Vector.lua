@@ -138,7 +138,7 @@ function Vector:setMag(mag)
   self:normalize()
   
   self:mult(mag)
-  print(inspect(self))
+  
   recalculate(self)
   
   return self
