@@ -5,6 +5,8 @@ local Static = require("modules/Static")
 
 local Entity = Object:extend()
 
+local GRAVITY = Vector(0, 120)
+
 Entity:implement(Sprite)
 Entity:implement(Static)
 
@@ -40,8 +42,8 @@ function Entity:get_speed() return self.vel.mag end
 function Entity:draw(speed)
 	local oh, ow --my bones
 	
-	ow = self._.raw_img.w / 2
-	oh = self._.raw_img.h / 2
+	ow = self._.raw_size.x / 2
+	oh = self._.raw_size.y / 2
 	
 	if Sprite.is(self.img) then
 		self.img:draw(speed, self.pos.x, self.pos.y, 0, size.scale.x, size.scale.y, ow, oh)
@@ -55,14 +57,15 @@ end
 function Entity:update(dt)
 	
 	if self.type == "dyn" then
-		self._.raw_acc:add(GRAVITY)
+		self._.raw_acc:add(Vector(GRAVITY.x, GRAVITY.y * dt))
 		self.acc:set(self._.raw_acc * size.scale)
+		self._.raw_acc:set(0, 0)
 	end
 	
-	self._.raw_vel:add(self._.raw_acc)
+	self._.raw_vel:add(self.acc)
 	self.vel:set(self._.raw_vel * size.scale)
 	
-	self._.raw_pos:add(self._.raw_vel)
+	self._.raw_pos:add(self.vel)
 	self.pos:set(self._.raw_pos * size.scale)
 	
 	return self
@@ -70,9 +73,14 @@ end
 
 function Entity:accelerate(x, y)
 	y = -y
-	x = -x
 	
-	self._.raw_acc:add(Vector(x, y))
+	if type(x) == "number" then
+		self._.raw_acc:add(Vector(x, y))
+	else
+		assert(x:__type() == "vector", "Must only add vectors.")
+		self._.raw_acc:add(x)
+	end
+
 	self.acc:set(self._.raw_acc * size.scale)
 	
 	return self
@@ -80,9 +88,14 @@ end
 
 function Entity:addVelocity(x, y)
 	y = -y
-	x = -x
-	
-	self._.raw_vel:add(Vector(x, y))
+		
+	if type(x) == "number" then
+		self._.raw_vel:add(Vector(x, y))
+	else
+		assert(x:__type() == "vector", "Must only add vectors.")
+		self._.raw_vel:add(x)
+	end
+
 	self.vel:set(self._.raw_vel * size.scale)
 	
 	return self
@@ -104,11 +117,11 @@ function Entity:destroy()
 end
 
 function Entity.is(e)
-	if e.__type then
-		return e:__type() == "entity"
+	if type(e) == "table" then
+		return e.__type and e:__type() == "entity" or false
 	else
 		return false
-	end	
+	end
 end
 
 function Entity:__type()

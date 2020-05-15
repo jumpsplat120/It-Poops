@@ -27,8 +27,8 @@ function love.load()
 	loadObjectTextures()
 	
 	player = { 
-		e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4),
-		jump  = 10,
+		e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4, nil, nil, nil, "dyn"),
+		jump  = 25,
 		score = 0,
 		poops = {}
 	}
@@ -57,6 +57,8 @@ function love.update(dt)
 	for i = 1, #player.poops, 1 do
 		player.poops[i]:update(dt)
 	end
+	
+	print(player.e.vel.mag)
 
 	time = time + dt
 end
@@ -65,6 +67,12 @@ function love.draw()
 	for i = 1, #loaded_objects, 1 do
 		loaded_objects[i]:draw()
 	end
+	
+	for i = 1, #player.poops, 1 do
+		player.poops[i]:update(dt)
+	end
+	
+	player.e:draw(2)
 end
 
 function love.resize()
@@ -78,7 +86,13 @@ function love.keypressed(k)
 	jump = k == "space"
 	poop = k == "e"
 	
-	if jump then player.e:addVelocity(0, player.jump) end
+	if jump then 
+		player.e:addVelocity(0, player.jump)
+		
+		if player.e.vel.mag > 10 then --diminishing returns
+			player.e:addVelocity(0, (player.e.vel.mag / 10) * -5)
+		end
+	end
 	
 	if poop then player.poops[#player.poops + 1] = createPoop() end
 end

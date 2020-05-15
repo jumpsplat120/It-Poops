@@ -78,13 +78,13 @@ end
 function Sprite:draw(speed, x, y, r, sx, sy, ox, oy)
 	love.graphics.draw(self.img, self.frame, x, y, r, xs, sy, ox, oy)
 	
-	self._.frames_index = self._.frames_index + speed >= self._.frame_max and 1 + speed or self._.frames_index + speed
-	self._.frame        = self._.frames[math.floor(self._.frames_index) > self._.frame_max and self._.frame_max or math.floor(self._.frames_index)]
+	self._.frame_index = self._.frame_index + speed >= self._.frame_max and 1 + speed or self._.frame_index + speed
+	self._.frame       = self._.frames[math.floor(self._.frame_index) > self._.frame_max and self._.frame_max or math.floor(self._.frame_index)]
 end
 
 function Sprite.is(s)
-	if s.__type then
-		return s:__type() == "sprite"
+	if type(s) == "table" then
+		return s.__type and s:__type() == "sprite" or false
 	else
 		return false
 	end	

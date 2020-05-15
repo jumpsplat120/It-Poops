@@ -49,11 +49,11 @@ function Static:__type()
 end
 
 function Static.is(s)
-	if s.__type then
-		return s:__type() == "static"
+	if type(s) == "table" then
+		return s.__type and s:__type() == "static" or false
 	else
 		return false
-	end
+	end	
 end
 
 return Static

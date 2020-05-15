@@ -27,8 +27,8 @@ function Vector.Random()
 end
 
 function Vector.is(v)
-	if v.__type then
-		return v:__type() == "vector"
+	if type(v) == "table" then
+		return v.__type and v:__type() == "vector" or false
 	else
 		return false
 	end	
@@ -112,7 +112,6 @@ function Vector:set(x, y)
 	return self
 end
 
-
 function Vector:replace(v)
 	assert(Vector.is(v), "Not a vector.")
 	
@@ -127,7 +126,6 @@ function Vector:clone()
   return Vector(self.x, self.y)
 end
 
-
 function Vector:getMag()
 	return self.mag
 end
@@ -139,10 +137,8 @@ end
 function Vector:setMag(mag)
   self:normalize()
   
-  local v = self * mag
-  
-  self:replace(v)
-  
+  self:mult(mag)
+  print(inspect(self))
   recalculate(self)
   
   return self
