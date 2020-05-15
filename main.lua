@@ -26,12 +26,7 @@ function love.load()
 	loadAnimatedTextures()
 	loadObjectTextures()
 	
-	player = { 
-		e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4, nil, nil, nil, "dyn"),
-		jump  = 25,
-		score = 0,
-		poops = {}
-	}
+	calculatePlayer()
 end
 
 function love.update(dt)
@@ -44,6 +39,9 @@ function love.update(dt)
 		player.e:addVelocity(50 * dt, 0)
 	elseif left then
 		player.e:addVelocity(-50 * dt, 0)
+	else
+		--slows movement along x axis when no longer pressing left or right
+		player.e:addVelocity(player.e.vel.x / -10, 0)
 	end
 
 	player.e:update(dt)
@@ -78,6 +76,7 @@ end
 function love.resize()
 	calculateSize()
 	calculateBounds()
+	calculatePlayer()
 end
 
 function love.keypressed(k)
@@ -90,7 +89,7 @@ function love.keypressed(k)
 		player.e:addVelocity(0, player.jump)
 		
 		if player.e.vel.mag > 10 then --diminishing returns
-			player.e:addVelocity(0, (player.e.vel.mag / 10) * -5)
+			player.e:addVelocity(0, -(player.e.vel.mag))
 		end
 	end
 	
@@ -208,6 +207,21 @@ function calculateBounds()
 		left   = Entity(textures.blank, -50, 0, 50,  h, nil, "env"),
 		right  = Entity(textures.blank,   w, 0, 50,  h, nil, "env")
 	}
+end
+
+function calculatePlayer()
+	local JUMP = 100
+	
+	if #player == 0 then
+		player = { 
+			e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4, nil, nil, nil, "dyn"),
+			jump  = JUMP * size.scale.y,
+			score = 0,
+			poops = {}
+		}
+	else
+		player.jump = JUMP * size.scale.y
+	end
 end
 
 function endGame()
