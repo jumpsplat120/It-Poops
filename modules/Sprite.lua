@@ -4,8 +4,8 @@ local Sprite = Object:extend()
 function Sprite:new(img, rows, cols, name)
 	local frame_width, frame_height, t, w, h
 	
-	w   = img:getWidth()
-	h   = img:getHeight()
+	w = img:getWidth()
+	h = img:getHeight()
 	
 	self.img = img
 	
@@ -35,6 +35,10 @@ function Sprite:new(img, rows, cols, name)
 	self._.frame_max        = #self._.frames
 	
 	return self
+end
+
+function Sprite:clone()	
+	return deepCopy(self)
 end
 
 function Sprite:addAnimation(img, rows, cols, name)
@@ -77,9 +81,9 @@ end
 
 function Sprite:draw(speed, x, y, r, sx, sy, ox, oy)
 	love.graphics.draw(self.img, self.frame, x, y, r, sx, sy, ox, oy)
-	
+
 	self._.frame_index = self._.frame_index + speed >= self._.frame_max and 1 + speed or self._.frame_index + speed
-	self._.frame       = self._.frames[math.floor(self._.frame_index) > self._.frame_max and self._.frame_max or math.floor(self._.frame_index)]
+	self.frame         = self._.frames[math.floor(self._.frame_index) > self._.frame_max and self._.frame_max or math.floor(self._.frame_index)]
 end
 
 function Sprite.is(s)

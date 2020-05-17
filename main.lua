@@ -1,31 +1,30 @@
 inspect = require("third_party/inspect")
 
-local Vector, Quad, Entity, Static
-textures, loaded_objects, player, size, bounds, time = {}, {}, {}, {}, {}, 0
+local Vector, Quad, Entity, Static, Background
+textures, loaded_objects, background_objects, player, size, bounds, time, gdt = {}, {}, {}, {}, {}, {}, 0, 0
 
-Vector = require("modules/Vector")
-Sprite = require("modules/Sprite")
-Static = require("modules/Static")
-Entity = require("modules/Entity")
+Vector     = require("modules/Vector")
+Sprite     = require("modules/Sprite")
+Static     = require("modules/Static")
+Entity     = require("modules/Entity")
+Background = require("modules/Background")
 
 function love.load()
-	local background, sprites, loaded_objects, win_w, win_h
+	local win_w, win_h, _ = love.window.getMode()
 	
-	time, pull      = 0, 0
-	win_w, win_h, _ = love.window.getMode()
+	time = 0
 	
 	calculateSize()
-	
-	loaded_objects = {}
 	
 	textures = { blank = Static(love.graphics.newImage("assets/blank.png"), "blank") }
 	
 	calculateBounds()
-		
+
 	loadBackgroundTextures()
 	loadAnimatedTextures()
 	loadObjectTextures()
 	
+	calculateBGObjects()
 	calculatePlayer()
 end
 
@@ -35,47 +34,42 @@ function love.update(dt)
 	right = love.keyboard.isDown("d")
 	left  = love.keyboard.isDown("a")
 	
-	if right then
-		player.e:accelerate((50 * dt) * size.scale.x, 0)
-	elseif left then
-		player.e:accelerate((-50 * dt) * size.scale.x, 0)
-	else
-		--slows movement along x axis when no longer pressing left or right
-		player.e:accelerate(player.e.vel.x / -20, 0)
+	if math.abs(player.e.vel.x) < player.move.max then
+		if right then
+			player.e:accelerate(player.move.speed, 0)
+		elseif left then
+			player.e:accelerate(-player.move.speed, 0)
+		end
 	end
+	
+	--wind resistance
+	player.e:accelerate(-player.e.vel.x * .1, 0)
 
 	player.e:update(dt)
-	player.e._.raw_vel:maxMag(30)
 	
-	if outOfBounds() then endGame() end
+	if player.e:oob() then print("Hit edge") end
 	
-	for i = 1, #loaded_objects, 1 do
-		loaded_objects[i]:update(dt)
-	end
+	updateObjectTable(background_objects)
+	updateObjectTable(loaded_objects)
+	updateObjectTable(player.poops)
 	
-	for i = 1, #player.poops, 1 do
-		player.poops[i]:update(dt)
-	end
-	
+	gdt  = dt
 	time = time + dt
 end
 
 function love.draw()
-	for i = 1, #loaded_objects, 1 do
-		loaded_objects[i]:draw()
-	end
-	
-	for i = 1, #player.poops, 1 do
-		player.poops[i]:update(dt)
-	end
-	
-	player.e:draw(2)
+	love.graphics.scale(size.scale.x, size.scale.y)
+	drawObjectTable(background_objects)
+	drawObjectTable(loaded_objects)
+	drawObjectTable(player.poops)
+	player.e:draw(5 * gdt)
 end
 
 function love.resize()
 	calculateSize()
-	calculateBounds()
+	calculateBounds() 
 	calculatePlayer()
+	calculateBGObjects()
 end
 
 function love.keypressed(k)
@@ -85,7 +79,7 @@ function love.keypressed(k)
 	poop = k == "e"
 	
 	if jump then
-		player.e:impulse(0, player.jump)
+		player.e.vel:set(player.e.vel.x, player.jump)
 	end
 	
 	if poop then player.poops[#player.poops + 1] = createPoop() end
@@ -129,7 +123,7 @@ function loadObjectTextures()
 	t.chimney  = Static(love.graphics.newImage(objs .. "chimney.png"), "chimney")
 	t.poop     = Static(love.graphics.newImage(objs .. "falling_poop.png"), "falling")
 	
-	t.poop:addImage(objs .. "fallen_poop.png", "fallen")
+	t.poop:addImage(love.graphics.newImage(objs .. "fallen_poop.png"), "fallen")
 	
 	textures.static = t
 end
@@ -138,14 +132,14 @@ function loadStaticsFromFolder(path)
 	local i, res, succ, val
 	
 	i    = 1
-	res  = Static(love.graphics.newImage(path .. "/1.png"), "1")
+	res  = Static(love.graphics.newImage(path .. "/1.png"), 1)
 	
 	succ, val = pcall(love.graphics.newImage, path .. "/2.png")
 	
 	i = 2
 	
 	while succ do
-		res:addImage(val, tostring(i))
+		res:addImage(val, i)
 
 		i = i + 1
 		
@@ -176,6 +170,21 @@ function loadSpritesFromFolder(path, rows, cols)
 	return res
 end
 
+function calculateBGObjects()
+	if #background_objects == 0 then
+		background_objects = {
+			Background(textures.bg.sky),
+			Background(textures.bg.clouds:random(),                                        nil, love.math.random(0, 50), nil, nil, Vector(-.5, 0)),
+			Background(textures.bg.clouds:random(), size.full.x * love.math.random(5, 10) / 10, love.math.random(0, 50), nil, nil, Vector(-.5, 0)),
+			Background(textures.bg.clouds:random(), size.full.x * love.math.random(5, 10) / 10, love.math.random(0, 50), nil, nil, Vector(-.5, 0)),
+			Background(textures.bg.mountains,                                      size.full.x,                     nil, nil, nil, Vector(-1, 0)),
+			Background(textures.bg.mountains,                                              nil,                     nil, nil, nil, Vector(-1, 0)),
+			Background(textures.bg.city,                                           size.full.x,                     nil, nil, nil, Vector(-2, 0)),
+			Background(textures.bg.city,                                                   nil,                     nil, nil, nil, Vector(-2, 0))
+		}
+	end
+end
+
 function calculateSize()
 	local w, h, _ = love.window.getMode()
 
@@ -194,28 +203,88 @@ function calculateSize()
 end
 
 function calculateBounds()
-	local w, h = size.win.x, size.win.y
+	local x, y, w, h
+	
+	w = size.full.x
+	h = size.full.y
+	x = w / 2
+	y = h / 2 
 	
 	bounds = { 
-		top    = Entity(textures.blank, 0, -50,  w, 50, nil, "env"),
-		bottom = Entity(textures.blank, 0,   h,  w, 50, nil, "env"),
-		left   = Entity(textures.blank, -50, 0, 50,  h, nil, "env"),
-		right  = Entity(textures.blank,   w, 0, 50,  h, nil, "env")
+		top    = Entity(textures.blank,   0, -50,  w, 50, nil, "env"),
+		bottom = Entity(textures.blank,   0,   h,  w, 50, nil, "env"),
+		left   = Entity(textures.blank, -50,   0, 50,  h, nil, "env"),
+		right  = Entity(textures.blank,   w,   0, 50,  h, nil, "env"),
+		inner  = Entity(textures.blank,   0,   0,  w,  h, nil, "env")
 	}
 end
 
+function deepCopy(orig, copies)
+    copies = copies or {}
+    local orig_type = type(orig)
+    local copy
+    if orig_type == 'table' then
+        if copies[orig] then
+            copy = copies[orig]
+        else
+            copy = {}
+            copies[orig] = copy
+            for orig_key, orig_value in next, orig, nil do
+                copy[deepCopy(orig_key, copies)] = deepCopy(orig_value, copies)
+            end
+            setmetatable(copy, deepCopy(getmetatable(orig), copies))
+        end
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+	
+    return copy
+end
+
 function calculatePlayer()
-	local JUMP = 10
+	local JUMP, MOVE
+	
+	JUMP = -13
+	MOVE = 4
 	
 	if #player == 0 then
 		player = { 
 			e     = Entity(Sprite(love.graphics.newImage("assets/sprites/bird.png"), 2, 2, "gliding"), 500, size.win.y / 4, nil, nil, nil, "dyn"),
-			jump  = JUMP * size.scale.y,
+			jump  = JUMP,
+			move  = {
+				speed = MOVE,
+				max   = 8
+			},
 			score = 0,
 			poops = {}
 		}
-	else
-		player.jump = JUMP * size.scale.y
+	end
+end
+
+function updateObjectTable(tbl)
+	for i = 1, #tbl, 1 do
+		if tbl[i] == nil then break end
+		
+		tbl[i]:update(dt)
+		
+		if tbl == background_objects then
+			local is_inb = tbl[i]:inb()
+
+			if not is_inb and tbl[i].was_inb then
+				tbl[i].pos.x = tbl[i].x + size.full.x * 2
+				tbl[i].was_inb = false
+			elseif is_inb then 
+				tbl[i].was_inb = true
+			end
+		else
+			if tbl[i]:oob() then table.remove(tbl, i) end
+		end
+	end
+end
+
+function drawObjectTable(tbl)
+	for i = 1, #tbl, 1 do
+		tbl[i]:draw()
 	end
 end
 
@@ -223,64 +292,11 @@ function endGame()
 	error("GAME OVER")
 end
 
-function outOfBounds()
-	return (player.e:collide(bounds.top) and player.e:collide(bounds.bottom) and player.e:collide(bounds.left) and player.e:collide(bounds.right))
-end
-
 function createPoop()
 	local img, e
 	
-	img = textures.static.falling_poop
-	e   = Entity(img, player.pos.x, player.pos.y, img:getWidth(), img:getHeight(), Vector.fromAngle(math.random(-5, 5)))
-	
-end
+	img = textures.static.poop
+	e   = Entity(img, player.e.x + player.e.w / 2, player.e.y + player.e.h / 2, img.w, img.h, Vector.fromAngle(math.random(-5, 5)), "dyn")
 
-
-
-
-function drawPoops()
-	local rw, sw, rh, st, new
-	
-	rh = size.height.scale
-	rw = size.width.scale
-	sw = size.width.half * rw
-	st = textures.static
-	new = {}
-
-	for i = 1, #player.poops, 1 do
-		local poop = player.poops[i]
-		local x = (time - poop[3]) * -200 * rw
-
-		poop[2] = poop[4] and size.height.window - (50 * rh) or poop[2] + gdt * GRAVITY * ((time - poop[3]) * 35)
-
-		if poop[2] * rh > size.height.window - (25 * rh) then poop[4] = true end
-
-		if poop[4] then
-			love.graphics.draw(st.fallen_poop, x + poop[1] * rw, poop[2], 0, rw, rh)
-		else
-			love.graphics.draw(st.falling_poop, x + poop[1] * rw, poop[2] * rh, 0, rw, rh)
-		end
-		
-		if poop[1] > 0 then new[#new + 1] = player.poops[i] end
-	end
-	
-	player.poops = new
-end
-
-function cycle(input, min, max)
-	delta = max - min
-	
-	function down(carry, max)
-		carry = carry - delta
-		if carry > max then return down(carry, max) else return carry end
-	end
-	
-	function up(carry, min)
-		carry = carry + delta
-		if carry < min then return up(carry, min) else return carry end
-	end
-	
-	input = input > max and down(input, max) or (input < min and up(input, min) or input)
-	
-	return input
+	return e
 end

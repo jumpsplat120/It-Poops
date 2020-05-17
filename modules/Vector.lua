@@ -14,8 +14,6 @@ function Vector:new(x, y)
 	self.y = y or v.y
 
 	self.mag = math.sqrt(self.x ^ 2 + self.y ^ 2)
-	
-	return self
 end
 
 function Vector.fromAngle(deg)

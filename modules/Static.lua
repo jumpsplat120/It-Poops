@@ -7,13 +7,11 @@ function Static:new(img, name)
 	
 	self._ = {}
 	
-	self._.raw_size = Vector(img:getWidth(), img:getHeight())
-	
 	self._.imgs = { }
 	self._.imgs[name or "default"] = img
 	
 	self.img  = img
-	self.size = self._.raw_size * size.scale
+	self.size = Vector(img:getWidth(), img:getHeight())
 	self.name = name
 
 	return self
@@ -21,6 +19,10 @@ end
 
 function Static:get_w() return self.size.x end
 function Static:get_h() return self.size.y end
+
+function Static:clone()	
+	return deepCopy(self)
+end
 
 function Static:addImage(img, name)
 	assert(img and name, "Name and img are required.")
@@ -30,11 +32,16 @@ function Static:addImage(img, name)
 	return self
 end
 
+function Static:random()
+	self:changeImage(love.math.random(#self._.imgs))
+	
+	return self
+end
+
 function Static:changeImage(name)
 	local new_img = self._.imgs[name]
-	
-	assert(new_image, "No image found with name " .. name)
-	
+
+	assert(new_img, "No image found with name " .. name)
 	self.img = new_img
 	
 	return self

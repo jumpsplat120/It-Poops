@@ -18,19 +18,14 @@ function Entity:new(img, x, y, w, h, vel, t)
 	
 	self._ = {}
 	
-	self._.raw_pos  = Vector(x or 0, y or 0)	
-	self._.raw_size = Vector(w or img.w, h or img.h)
-	self._.raw_vel  = vel or Vector(0, 0)
-	self._.raw_acc  = Vector(0, 0)
+	self.pos  = Vector(x or 0, y or 0)
+	self.size = Vector(w or img.w, h or img.h)
+	self.vel  = vel or Vector(0, 0)
+	self.acc  = Vector(0, 0)
 
-	self.img  = img
-	self.pos  = self._.raw_pos  * size.scale
-	self.size = self._.raw_size * size.scale
-	self.vel  = self._.raw_vel  * size.scale
-	self.acc  = self._.raw_acc  * size.scale
+	self.img  = img:clone()
+
 	self.type = t or "env" --env or dyn
-	
-	return self
 end
 
 function Entity:get_x() return self.pos.x end
@@ -39,16 +34,24 @@ function Entity:get_w() return self.size.x end
 function Entity:get_h() return self.size.y end
 function Entity:get_speed() return self.vel.mag end
 
+function Entity:set_x(val) self.pos.x = val end
+function Entity:set_y(val) self.pos.y = val end
+function Entity:set_w(val) self.size.x = val end
+function Entity:set_h(val) self.size.y = val end
+function Entity:set_speed(val) self.vel:setMag(val) end
+
+function Entity:drawHitbox(r, g, b)
+	love.graphics.push("all")
+		love.graphics.setColor(r, g, b, 1)
+		love.graphics.rectangle("line", self.pos.x, self.pos.y, self.size.x, self.size.y)
+	love.graphics.pop()
+end
+
 function Entity:draw(speed)
-	local oh, ow --my bones
-	
-	ow = self._.raw_size.x / 2
-	oh = self._.raw_size.y / 2
-	
 	if Sprite.is(self.img) then
-		self.img:draw(speed, self.pos.x, self.pos.y, 0, size.scale.x, size.scale.y, ow, oh)
+		self.img:draw(speed, self.pos.x, self.pos.y)
 	elseif Static.is(self.img) then
-		self.img:draw(self.pos.x, self.pos.y, 0, size.scale.x, size.scale.y, ow, oh)
+		self.img:draw(self.pos.x, self.pos.y)
 	end
 	
 	return self
@@ -56,16 +59,11 @@ end
 
 function Entity:update(dt)
 	if self.type == "dyn" then
-		self._.raw_acc:add(GRAVITY)
-		self.acc:set(self._.raw_acc * size.scale)
-		self._.raw_acc:set(0, 0)
+		self.acc:add(GRAVITY)
 	end
-
-	self._.raw_vel:add(self.acc)
-	self.vel:set(self._.raw_vel * size.scale)
-
-	self._.raw_pos:add(self.vel)
-	self.pos:set(self._.raw_pos * size.scale)
+	self.vel:add(self.acc)
+	self.pos:add(self.vel)
+	self.acc:set(0, 0)
 
 	return self
 end
@@ -74,10 +72,10 @@ function Entity:accelerate(x, y)
 	y = -y
 
 	if type(x) == "number" then
-		self._.raw_acc:add(Vector(x, y))
+		self.acc:add(Vector(x, y))
 	else
 		assert(x:__type() == "vector", "Must only add vectors.")
-		self._.raw_acc:add(x)
+		self.acc:add(x)
 	end
 	
 	return self
@@ -87,28 +85,34 @@ function Entity:impulse(x, y)
 	y = -y
 		
 	if type(x) == "number" then
-		self._.raw_vel:add(Vector(x, y))
+		self.vel:add(Vector(x, y))
 	else
 		assert(x:__type() == "vector", "Must only add vectors.")
-		self._.raw_vel:add(x)
+		self.vel:add(x)
 	end
 	
 	return self
 end
 
 function Entity:collide(o)
-	local x, y, w, h
+	local x1, y1, w1, h1
+	local x2, y2, w2, h2
 	
-	x = self.pos.x
-	y = self.pos.y
-	w = self.size.x
-	h = self.size.y
-
-	return ((x < o.x + o.w) and (x + w > o.x) and (y < o.y + o.h) and (y + h > o.y))
+	w1 = self.size.x
+	h1 = self.size.y
+	x1 = self.pos.x
+	y1 = self.pos.y
+	
+	w2 = o.size.x
+	h2 = o.size.y
+	x2 = o.pos.x
+	y2 = o.pos.y
+	
+	return ((x1 < x2 + w2) and (x1 + w1 > x2) and (y1 < y2 + h2) and (y1 + h1 > y2))
 end
 
-function Entity:destroy()
-	self = nil
+function Entity:oob()
+	return (self:collide(bounds.top) or self:collide(bounds.bottom) or self:collide(bounds.left) or self:collide(bounds.right))
 end
 
 function Entity.is(e)
