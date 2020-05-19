@@ -32,6 +32,10 @@ function Vector.is(v)
 	end	
 end
 
+function Vector:inRect(x, y, w, h)
+	return self.x >= x and self.x <= x + w and self.y >= y and self.y <= y + h
+end
+
 function Vector:add(b)
 	if type(b) == "number" then
 		self.x = self.x + b
@@ -152,7 +156,7 @@ end
 function Vector:__add(b)
 	local v = Vector(0, 0)
 	
-	assert(Vector.is(b), "Unable to add.")
+	if type(b) == "number" then b = {x = b, y = b} end
 	
 	v.x = self.x + b.x
 	v.y = self.y + b.y
@@ -163,8 +167,8 @@ end
 function Vector:__sub(b)
 	local v = Vector(0, 0)
 	
-	assert(Vector.is(b), "Unable to subtract.")
-	
+	if type(b) == "number" then b = {x = b, y = b} end
+	if type(b) == "number" then b = {x = b, y = b} end
 	v.x = self.x - b.x
 	v.y = self.y - b.y
 	
@@ -174,7 +178,7 @@ end
 function Vector:__mul(b)
 	local v = Vector(0, 0)
 	
-	assert(Vector.is(b), "Unable to multiply.")
+	if type(b) == "number" then b = {x = b, y = b} end
 	
 	v.x = self.x * b.x
 	v.y = self.y * b.y
@@ -185,7 +189,7 @@ end
 function Vector:__div(b)
 	local v = Vector(0, 0)
 	
-	assert(Vector.is(b), "Unable to multiply.")
+	if type(b) == "number" then b = {x = b, y = b} end
 	
 	v.x = self.x / b.x
 	v.y = self.y / b.y
@@ -194,7 +198,7 @@ function Vector:__div(b)
 end
 
 function Vector:__eq(b)
-	assert(Vector.is(b), "Unable to multiply.")
+	assert(Vector.is(b), "Unable to check equality.")
   
 	return self.x == b.x and self.y == b.y
 end

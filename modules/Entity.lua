@@ -18,14 +18,16 @@ function Entity:new(img, x, y, w, h, vel, t)
 	
 	self._ = {}
 	
-	self.pos  = Vector(x or 0, y or 0)
-	self.size = Vector(w or img.w, h or img.h)
-	self.vel  = vel or Vector(0, 0)
-	self.acc  = Vector(0, 0)
+	self.pos    = Vector(x or 0, y or 0)
+	self.size   = Vector(w or img.w, h or img.h)
+	self.hitbox = {pos = self.pos:clone(), size = self.size:clone() }
+	self.vel    = vel or Vector(0, 0)
+	self.acc    = Vector(0, 0)
 
 	self.img  = img:clone()
-
 	self.type = t or "env" --env or dyn
+	
+	self.was_inb = inb ~= nil and inb or false
 end
 
 function Entity:get_x() return self.pos.x end
@@ -40,10 +42,17 @@ function Entity:set_w(val) self.size.x = val end
 function Entity:set_h(val) self.size.y = val end
 function Entity:set_speed(val) self.vel:setMag(val) end
 
+function Entity:setHitbox(x, y, w, h)
+	self.hitbox.pos:set(x, y)
+	self.hitbox.size:set(w, h)
+	
+	return self
+end
+
 function Entity:drawHitbox(r, g, b)
 	love.graphics.push("all")
 		love.graphics.setColor(r, g, b, 1)
-		love.graphics.rectangle("line", self.pos.x, self.pos.y, self.size.x, self.size.y)
+		love.graphics.rectangle("line", self.hitbox.pos.x, self.hitbox.pos.y, self.hitbox.size.x, self.hitbox.size.y)
 	love.graphics.pop()
 end
 
@@ -61,10 +70,12 @@ function Entity:update(dt)
 	if self.type == "dyn" then
 		self.acc:add(GRAVITY)
 	end
+	
 	self.vel:add(self.acc)
 	self.pos:add(self.vel)
+	self.hitbox.pos:add(self.vel)
 	self.acc:set(0, 0)
-
+	
 	return self
 end
 
@@ -98,21 +109,21 @@ function Entity:collide(o)
 	local x1, y1, w1, h1
 	local x2, y2, w2, h2
 	
-	w1 = self.size.x
-	h1 = self.size.y
-	x1 = self.pos.x
-	y1 = self.pos.y
+	w1 = self.hitbox.size.x
+	h1 = self.hitbox.size.y
+	x1 = self.hitbox.pos.x
+	y1 = self.hitbox.pos.y
 	
-	w2 = o.size.x
-	h2 = o.size.y
-	x2 = o.pos.x
-	y2 = o.pos.y
+	w2 = o.hitbox.size.x
+	h2 = o.hitbox.size.y
+	x2 = o.hitbox.pos.x
+	y2 = o.hitbox.pos.y
 	
 	return ((x1 < x2 + w2) and (x1 + w1 > x2) and (y1 < y2 + h2) and (y1 + h1 > y2))
 end
 
 function Entity:oob()
-	return (self:collide(bounds.top) or self:collide(bounds.bottom) or self:collide(bounds.left) or self:collide(bounds.right))
+	return self:collide(bounds.bottom) or self:collide(bounds.left) or self:collide(bounds.right)
 end
 
 function Entity.is(e)

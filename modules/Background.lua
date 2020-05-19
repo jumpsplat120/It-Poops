@@ -3,11 +3,11 @@ local Entity = require("modules/Entity")
 
 local Background = Entity:extend()
 
-function Background:new(img, x, y, w, h, vel, inb)
+function Background:new(img, x, y, w, h, vel, name, inb)
 
 	Background.super.new(self, img, x, y, w, h, vel)
 
-	self.was_inb = inb
+	self.name = name
 end
 
 function Background:get_x() return self.pos.x end
